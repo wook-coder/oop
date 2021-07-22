@@ -1,20 +1,25 @@
-package com.pratice.oop.bookstore.data.entity;
+package com.pratice.oop.bookstore.data.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.pratice.oop.bookstore.data.repository.BookRepository;
+import com.pratice.oop.bookstore.data.entity.Book;
+import com.pratice.oop.exception.NotFoundBookException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.transaction.Transactional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+@Transactional
 @DataJpaTest
-class BookTest {
+class BookRepositoryTest {
+
 
   @Autowired
   BookRepository bookRepository;
@@ -28,15 +33,9 @@ class BookTest {
         DynamicTest.dynamicTest("저장 한 책들의 목록을 조회할 수 있는가?", this::책_목록_조회),
         DynamicTest.dynamicTest("저장 한 책 중에 하나를 조회할 수 있는가?", this::책_조회),
         DynamicTest.dynamicTest("책을 수정할 수 있는가?", this::책_수정),
-        DynamicTest.dynamicTest("수정 한 책의 이름, 제목, 설명, 수정일이 유효한가?", () -> {
-        }),
-        DynamicTest.dynamicTest("삭제 할 수 있는가?", () -> {
-        }),
-        DynamicTest.dynamicTest("삭제 한 책을 제외한 목룍을 조회할 수 있는가?", () -> {
-        }),
-        DynamicTest.dynamicTest("삭제 한 책을 조회하려고 할 때 '이미 삭제 된 책입니다.' 라고 에러 메시지를 응답하는가?", () -> {
-        })
-    );
+        DynamicTest.dynamicTest("삭제 할 수 있는가?", this::책_삭제),
+        DynamicTest.dynamicTest("삭제 한 책을 조회하려고 할 때 '이미 삭제 된 책입니다.' 라고 에러 메시지를 응답하는가?",
+                                this::삭제_된_책_조회));
   }
 
   private void 책_저장() {
@@ -58,11 +57,23 @@ class BookTest {
     assertThat(actualBooks).isNotNull()
                            .isNotEmpty()
                            .filteredOn(book -> !book.isDeleteAt())
-                           .containsAll(List.of(book1,
-                                                book2,
-                                                book3,
-                                                book4,
-                                                book5));
+                           .containsAll(List.of(book1, book2, book3, book4, book5));
+
+    long id = book1.getId();
+    assertThat(id).as("제대로 저장 되었는가? 잘 저장 되었다면 무조건 0 이상일 것이다.")
+                  .isGreaterThan(0);
+
+    assertDoesNotThrow(() -> {
+      //when
+      final Book actualBook = bookRepository.findByIdAndDeleteAtFalse(id)
+                                            .orElseThrow(RuntimeException::new);
+
+      //then
+      assertThat(actualBook).as("저장 한 책이 존재하는가?")
+                            .isNotNull()
+                            .as("기대한 책의 내용과 일치하는가?")
+                            .isEqualTo(actualBook);
+    });
   }
 
   private void 저장_한_책_유효성검사() {
@@ -101,11 +112,10 @@ class BookTest {
       final Book actualBook = bookRepository.findByIdAndDeleteAtFalse(expectedBook.getId())
                                             .orElseThrow(RuntimeException::new);
 
-      assertThat(actualBook).isNotNull()
-                            .extracting(Book::getTitle, Book::getDescription)
-                            .describedAs("책 이름과 책 설명이 맞는지 비교")
-                            .isEqualTo(List.of(expectedBook.getTitle(),
-                                               expectedBook.getDescription()));
+      assertThat(actualBook).as("저장 한 책을 조회 할 수 있는가?")
+                            .isNotNull()
+                            .as("책의 내용이 기대한 것과 일치 하는가?")
+                            .isEqualTo(expectedBook);
     });
   }
 
@@ -118,12 +128,48 @@ class BookTest {
     final Book actualBook = bookRepository.save(expectedBook);
     final int afterSize = bookRepository.findBookByDeleteAtFalseOrderByIdDesc().size();
 
-    assertThat(beforeSize).isEqualTo(afterSize);
+    assertThat(beforeSize).as("정말로 책이 등록되지않고 수정되었는가?")
+                          .isEqualTo(afterSize);
+    assertThat(expectedBook).as("등록 한 책이 있는가?")
+                            .isNotNull()
+                            .as("수정 한 내용이 잘 반영 되었는가?")
+                            .isEqualTo(actualBook);
+  }
 
-    assertThat(actualBook).isNotNull()
-                          .isEqualTo(expectedBook);
+  private void 책_삭제() {
+    //given
+    final Book expectedBook1 = bookRepository.save(Book.of("객체로 삭제 될 책",
+                                                           "책 중에 하나를 등록한다. 하지만 삭제할 것이다."));
+    final Book expectedBook2 = bookRepository.save(Book.of("ID로 삭제 될 책",
+                                                           "책 중에 하나를 등록한다. 하지만 아이디로 삭제할 것이다."));
 
-    assertThat(actualBook).extracting(Book::getUpdateTime)
-                          .isNotNull();
+    //when
+    bookRepository.delete(expectedBook1);
+    bookRepository.deleteById(expectedBook2.getId());
+
+    //then
+    boolean actual1 = bookRepository.existsById(expectedBook1.getId());
+    assertThat(actual1).as("등록 한 [%s]이 삭제 되었는가?", expectedBook1.getTitle()).isFalse();
+
+    boolean actual2 = bookRepository.existsById(expectedBook2.getId());
+    assertThat(actual2).as("등록 한 [%s]이 삭제 되었는가?", expectedBook2.getTitle()).isFalse();
+  }
+
+  private void 삭제_된_책_조회() {
+    //given
+    //책을 하나 등록한다.
+    final Book expectedBook = bookRepository.save(Book.of("ID로 삭제 될 책",
+                                                          "책 중에 하나를 등록한다. 하지만 아이디로 삭제할 것이다."));
+
+    //when
+    //등록 한 책을 삭제 한다.
+    long id = expectedBook.getId();
+    bookRepository.deleteById(id);
+
+    assertThrows(NotFoundBookException.class, () -> {
+      //삭제 한 책을 조회하려고 시도한다.
+      bookRepository.findByIdAndDeleteAtFalse(id)
+                    .orElseThrow(NotFoundBookException::new);
+    }, "이미 삭제 한 책을 조회 하려고 했을 때에는 예외가 발생해야 한다.");
   }
 }
