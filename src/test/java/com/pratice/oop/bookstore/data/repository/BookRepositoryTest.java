@@ -60,7 +60,8 @@ class BookRepositoryTest {
                            .containsAll(List.of(book1, book2, book3, book4, book5));
 
     long id = book1.getId();
-    assertThat(id).isNotNull().isGreaterThan(0);
+    assertThat(id).as("제대로 저장 되었는가? 잘 저장 되었다면 무조건 0 이상일 것이다.")
+                  .isGreaterThan(0);
 
     assertDoesNotThrow(() -> {
       //when
