@@ -168,8 +168,8 @@ class BookRepositoryTest {
 
     assertThrows(NotFoundBookException.class, () -> {
       //삭제 한 책을 조회하려고 시도한다.
-      final Book actualBook = bookRepository.findByIdAndDeleteAtFalse(id)
-                                            .orElseThrow(NotFoundBookException::new);
-    });
+      bookRepository.findByIdAndDeleteAtFalse(id)
+                    .orElseThrow(NotFoundBookException::new);
+    }, "이미 삭제 한 책을 조회 하려고 했을 때에는 예외가 발생해야 한다.");
   }
 }
