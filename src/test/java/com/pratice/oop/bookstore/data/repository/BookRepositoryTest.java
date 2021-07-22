@@ -114,7 +114,7 @@ class BookRepositoryTest {
 
       assertThat(actualBook).as("저장 한 책을 조회 할 수 있는가?")
                             .isNotNull()
-                            .as("책 이름과 책 설명이 맞는지 비교")
+                            .as("책의 내용이 기대한 것과 일치 하는가?")
                             .isEqualTo(expectedBook);
     });
   }
