@@ -128,7 +128,8 @@ class BookRepositoryTest {
     final Book actualBook = bookRepository.save(expectedBook);
     final int afterSize = bookRepository.findBookByDeleteAtFalseOrderByIdDesc().size();
 
-    assertThat(beforeSize).isEqualTo(afterSize);
+    assertThat(beforeSize).as("정말로 책이 등록되지않고 수정되었는가?")
+                          .isEqualTo(afterSize);
     assertThat(expectedBook).as("등록 한 책이 있는가?")
                             .isNotNull()
                             .as("수정 한 내용이 잘 반영 되었는가?")
